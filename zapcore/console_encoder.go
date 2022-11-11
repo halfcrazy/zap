@@ -22,6 +22,7 @@ package zapcore
 
 import (
 	"fmt"
+	"strings"
 
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/internal/bufferpool"
@@ -34,6 +35,19 @@ var _sliceEncoderPool = pool.New(func() *sliceArrayEncoder {
 	}
 })
 
+const (
+	OrderFieldTime     string = "Time"
+	OrderFieldLevel    string = "Level"
+	OrderFieldName     string = "Name"
+	OrderFieldCallee   string = "Callee"
+	OrderFieldFunction string = "Function"
+	OrderFieldMessage  string = "Message"
+	OrderFieldStack    string = "Stack"
+)
+
+var defaultConsoleOrder = []string{OrderFieldTime, OrderFieldLevel, OrderFieldName, OrderFieldCallee,
+	OrderFieldFunction, OrderFieldMessage, OrderFieldStack}
+
 func getSliceEncoder() *sliceArrayEncoder {
 	return _sliceEncoderPool.Get()
 }
@@ -45,6 +59,7 @@ func putSliceEncoder(e *sliceArrayEncoder) {
 
 type consoleEncoder struct {
 	*jsonEncoder
+	order []string
 }
 
 // NewConsoleEncoder creates an encoder whose output is designed for human -
@@ -60,11 +75,17 @@ func NewConsoleEncoder(cfg EncoderConfig) Encoder {
 		// Use a default delimiter of '\t' for backwards compatibility
 		cfg.ConsoleSeparator = "\t"
 	}
-	return consoleEncoder{newJSONEncoder(cfg, true)}
+	var order []string
+	if cfg.ConsoleFieldOrder == "" {
+		order = defaultConsoleOrder
+	} else {
+		order = strings.Split(cfg.ConsoleFieldOrder, ",")
+	}
+	return consoleEncoder{newJSONEncoder(cfg, true), order}
 }
 
 func (c consoleEncoder) Clone() Encoder {
-	return consoleEncoder{c.jsonEncoder.Clone().(*jsonEncoder)}
+	return consoleEncoder{c.jsonEncoder.Clone().(*jsonEncoder), c.order}
 }
 
 func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, error) {
@@ -76,6 +97,17 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 	//
 	// If this ever becomes a performance bottleneck, we can implement
 	// ArrayEncoder for our plain-text format.
+	for _, f := range c.order {
+		switch f {
+		case OrderFieldTime:
+		case OrderFieldLevel:
+		case OrderFieldName:
+		case OrderFieldCallee:
+		case OrderFieldFunction:
+		case OrderFieldMessage:
+		case OrderFieldStack:
+		}
+	}
 	arr := getSliceEncoder()
 	if c.TimeKey != "" && c.EncodeTime != nil && !ent.Time.IsZero() {
 		c.EncodeTime(ent.Time, arr)
