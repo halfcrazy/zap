@@ -22,8 +22,6 @@ package zapcore
 
 import (
 	"fmt"
-	"strings"
-
 	"go.uber.org/zap/buffer"
 	"go.uber.org/zap/internal/bufferpool"
 	"go.uber.org/zap/internal/pool"
@@ -35,17 +33,19 @@ var _sliceEncoderPool = pool.New(func() *sliceArrayEncoder {
 	}
 })
 
+type OrderField string
+
 const (
-	OrderFieldTime     string = "Time"
-	OrderFieldLevel    string = "Level"
-	OrderFieldName     string = "Name"
-	OrderFieldCallee   string = "Callee"
-	OrderFieldFunction string = "Function"
-	OrderFieldMessage  string = "Message"
-	OrderFieldStack    string = "Stack"
+	OrderFieldTime     OrderField = "Time"
+	OrderFieldLevel    OrderField = "Level"
+	OrderFieldName     OrderField = "Name"
+	OrderFieldCallee   OrderField = "Callee"
+	OrderFieldFunction OrderField = "Function"
+	OrderFieldMessage  OrderField = "Message"
+	OrderFieldStack    OrderField = "Stack"
 )
 
-var defaultConsoleOrder = []string{OrderFieldTime, OrderFieldLevel, OrderFieldName, OrderFieldCallee,
+var defaultConsoleOrder = []OrderField{OrderFieldTime, OrderFieldLevel, OrderFieldName, OrderFieldCallee,
 	OrderFieldFunction, OrderFieldMessage, OrderFieldStack}
 
 func getSliceEncoder() *sliceArrayEncoder {
@@ -59,7 +59,7 @@ func putSliceEncoder(e *sliceArrayEncoder) {
 
 type consoleEncoder struct {
 	*jsonEncoder
-	order []string
+	order []OrderField
 }
 
 // NewConsoleEncoder creates an encoder whose output is designed for human -
@@ -75,11 +75,9 @@ func NewConsoleEncoder(cfg EncoderConfig) Encoder {
 		// Use a default delimiter of '\t' for backwards compatibility
 		cfg.ConsoleSeparator = "\t"
 	}
-	var order []string
-	if cfg.ConsoleFieldOrder == "" {
-		order = defaultConsoleOrder
-	} else {
-		order = strings.Split(cfg.ConsoleFieldOrder, ",")
+	order := defaultConsoleOrder
+	if cfg.ConsoleFieldOrder != nil {
+		order = cfg.ConsoleFieldOrder
 	}
 	return consoleEncoder{newJSONEncoder(cfg, true), order}
 }
@@ -109,9 +107,6 @@ func (c consoleEncoder) EncodeEntry(ent Entry, fields []Field) (*buffer.Buffer, 
 		}
 	}
 	arr := getSliceEncoder()
-	if c.TimeKey != "" && c.EncodeTime != nil && !ent.Time.IsZero() {
-		c.EncodeTime(ent.Time, arr)
-	}
 	if c.LevelKey != "" && c.EncodeLevel != nil {
 		c.EncodeLevel(ent.Level, arr)
 	}
